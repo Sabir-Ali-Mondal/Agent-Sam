@@ -1,6 +1,6 @@
-# SPECIFICATION: AI Desktop Control Agent (2025–2026 Edition)
+# SPECIFICATION: AI Desktop Control Agent
 
-This system is a local, highly advanced AI desktop automation agent named **agent-sam**. It observes the screen natively, understands UI elements through vision-language processing, executes human-like actions, and learns workflows until the user goal is completed. 
+This system is a local, highly advanced AI desktop automation agent named **agent-sam**. It observes the screen natively, understands UI elements through vision-language processing, executes human-like actions, utilizes a Direct System Execution Layer for high-speed OS operations, and learns workflows until the user goal is completed. 
 
 Inspired by cutting-edge architectures like Anthropic's Computer Use, Open Interpreter, and Qwen-Agent, this system is designed for absolute precision, safety, and self-correction.
 
@@ -9,7 +9,7 @@ Inspired by cutting-edge architectures like Anthropic's Computer Use, Open Inter
 ## 1. Runtime Environment & Dependencies
 **Runtime Environment**
 *   **Programming language:** Python 3.14
-*   **Execution Logic:** All processing, vision, and reasoning happens 100% locally within the agent-sam process.
+*   **Execution Logic:** All processing, vision, OS integration, and reasoning happens 100% locally within the agent-sam process.
 
 **Embedded Inference Strategy (Zero User Setup)**
 *   **Goal:** Enable the AI model to run automatically within the application with zero user setup.
@@ -30,7 +30,7 @@ Select AI Model:
 *   **Screen capture:** MSS (aware of Windows DPI settings).
 *   **Mouse/Keyboard:** PyAutoGUI + `pynput` (for monitoring).
 *   **Computer Vision:** OpenCV (Set-of-Mark overlays).
-*   **System Environment:** `ctypes` (DPI Scaling multiplier extraction).
+*   **System Environment:** `ctypes`, `psutil`, `shutil`, `winreg` (For Windows DPI Scaling extraction, Application Registry, and Direct System Execution).
 *   **Storage:** `ChromaDB` (Vector RAG) and `SQLite` (Session logs).
 *   **UI:** `CustomTkinter` and `pystray`.
 
@@ -56,7 +56,7 @@ The system accepts user instructions through multiple integrated channels:
 ---
 
 ## 4. Full Unified Application Flowchart
-*(Control Flow + Data Flow + Memory + AI Interaction + 2026 Upgrades + Shutdown Flow)*
+*(Control Flow + Data Flow + Memory + AI Interaction + Direct Execution + Shutdown Flow)*
 
 ```text
 USER STARTS APPLICATION & INPUTS GOAL
@@ -84,8 +84,8 @@ LAUNCH AGENT & SYSTEM INITIALIZATION
         ├─ Initialize memory manager (SQLite + Vector DB)
         ├─ Initialize replay recorder
         ├─ Initialize screenshot engine (with DPI Scaling awareness)
-        ├─ Initialize grid engine
-        ├─ Initialize cursor tracker
+        ├─ Initialize grid engine & Cursor tracker
+        ├─ Initialize Direct System Execution Layer & App Registry
         ├─ Launch Internal llama.cpp Runtime as Background Component
         ├─ Load AI Model into VRAM (Keep-Alive lock applied)
         ├─ Initialize JSON repair layer & Loop detector
@@ -149,6 +149,7 @@ CONTEXT BUILDER & RAG MEMORY INJECTION
         │
         ├─ User goal & Current subgoal
         ├─ Screen summary & Visible UI elements
+        ├─ Internal Application Registry Status (Installed/Running apps)
         ├─ Vector DB query: Retrieve past successful workflows for context
         ├─ Cursor position & Last actions
         └─ Context Size Limiter (Top 20 elements, 5-action history limit)
@@ -156,13 +157,14 @@ CONTEXT BUILDER & RAG MEMORY INJECTION
         ▼
 PROMPT BUILDER & AI REASONING
         │
-        ├─ Insert system prompt & JSON action schema (Includes Below-the-Fold Scroll rule)
+        ├─ Insert system prompt & JSON action schema
         ├─ Insert UI context & Send Prompt -> Internal llama.cpp Component
         │
         ▼
-RECEIVE RESPONSE & SELF-REFLECTION LOOP (CRITIC)
+RECEIVE RESPONSE & CLASSIFICATION
         │
-        ├─ Critic Model check: "Does this action match visual reality?"
+        ├─ Request Class: Direct System Command? -> Execute via Direct System Layer (Bypass GUI)
+        └─ Request Class: GUI Interaction? -> Proceed to Reflection & Critic Loop
         │
         ▼
 JSON REPAIR LAYER & LOOP DETECTOR
@@ -173,24 +175,17 @@ JSON REPAIR LAYER & LOOP DETECTOR
         ▼
 SAFETY GUARD & ACTION VALIDATION
         │
-        ├─ Violates Safety Rules? (Delete sys files/shutdown/registry)
+        ├─ Violates Safety Rules? (Protect C:\Windows, allow user-directed OS commands)
         ├─ Element exists & Bounding box valid?
         ├─ Window focused & Cursor reachable?
         │
         ▼
-CURSOR MOVEMENT ENGINE & VERIFICATION
+ACTION EXECUTION (GUI OR DIRECT)
         │
-        ├─ Translate AI Grid/Box coordinates via Windows DPI Scaling multiplier
-        ├─ Human-like bezier movement (Speed profile + delay)
-        ├─ Micro screenshot at target -> Confirm element
-        └─ If mismatch -> Ask AI again
-        │
-        ▼
-ACTION EXECUTION (TEMPORAL CHUNKING & HEURISTICS)
-        │
-        ├─ Apply Double-Click Heuristic (Auto-upgrade left_click on desktop icons)
-        ├─ Execute Mouse/Keyboard/System ops
-        ├─ Execute Macro-actions (e.g., click + type + enter)
+        ├─ IF DIRECT: Execute OS Task (File/Web/App Control) instantly.
+        ├─ IF GUI: Translate AI Grid via DPI Multiplier -> Human-like bezier movement.
+        ├─ IF GUI: Apply Double-Click Heuristic (Auto-upgrade left_click on desktop icons).
+        ├─ IF GUI: Execute Macro-actions (Temporal Chunking).
         │
         ▼
 USER INTERFERENCE DETECTOR
@@ -235,13 +230,14 @@ GRACEFUL SHUTDOWN FLOW
 
 ---
 
-## 5. Architectural Upgrades (2025-2026 Cutting Edge)
-1.  **Set-of-Mark (SoM) / Visual Grounding Injection:** Bounding boxes with numeric IDs are drawn *directly onto the compressed screenshot sent to the AI*. The AI doesn't just guess coordinates; it outputs `"target": {"element_id": "42"}`, bridging the gap between reasoning and pixel execution natively.
-2.  **Temporal Action Chunking (Macro-Actions):** Instead of one click per loop, the AI can output chunked commands. Example: `["click_element(42)", "type_text('hello')", "press_key('enter')"]`. Reduces latency by 3x on form-filling.
-3.  **Self-Correction / Reflection Prompting Loop:** Before executing a destructive or complex click, a lightweight secondary prompt asks the local model: *"Review your proposed action against the visual state. Is this hallucinated?"* Drastically reduces misclicks.
-4.  **Semantic Memory RAG (Retrieval-Augmented Generation):** The system vectorizes successful task workflows. If the user asks "Book a flight", the system queries the Vector DB for `book_flight_workflow`, injecting the exact required UI path into the AI context window.
-5.  **Dynamic Resolution Scaling (Foveated Vision):** To save massive LLM context tokens, peripheral monitors/tiles are heavily downscaled, while the tile containing the active cursor/target window is rendered in maximum, crisp resolution for visual reading.
-6.  **Thought Cloning (Demonstration Mode):** If the agent loops or fails, the user takes over the mouse. The agent records the exact click, pairs it with the visual state, and saves it to the Vector DB for one-shot learning.
+## 5. Core Architectural Innovations
+1.  **Direct System Execution Layer:** Reduces dependency on screen interaction by programmatically handling file management, app launching, web browsing, and system commands natively via OS APIs, ensuring lightning-fast execution without mouse tracking.
+2.  **Set-of-Mark (SoM) / Visual Grounding Injection:** Bounding boxes with numeric IDs are drawn *directly onto the compressed screenshot sent to the AI*. The AI doesn't just guess coordinates; it outputs `"target": {"element_id": "42"}`, bridging the gap between reasoning and pixel execution natively.
+3.  **Temporal Action Chunking (Macro-Actions):** Instead of one click per loop, the AI can output chunked commands. Example: `["click_element(42)", "type_text('hello')", "press_key('enter')"]`. Reduces latency by 3x on form-filling.
+4.  **Self-Correction / Reflection Prompting Loop:** Before executing a destructive or complex click, a lightweight secondary prompt asks the local model: *"Review your proposed action against the visual state. Is this hallucinated?"* Drastically reduces misclicks.
+5.  **Semantic Memory RAG (Retrieval-Augmented Generation):** The system vectorizes successful task workflows. If the user asks "Book a flight", the system queries the Vector DB for `book_flight_workflow`, injecting the exact required UI path into the AI context window.
+6.  **Dynamic Resolution Scaling (Foveated Vision):** To save massive LLM context tokens, peripheral monitors/tiles are heavily downscaled, while the tile containing the active cursor/target window is rendered in maximum, crisp resolution for visual reading.
+7.  **Thought Cloning (Demonstration Mode):** If the agent loops or fails, the user takes over the mouse. The agent records the exact click, pairs it with the visual state, and saves it to the Vector DB for one-shot learning.
 
 ---
 
@@ -251,25 +247,30 @@ Main data objects moving continuously through the system (0.4s-0.8s intervals):
 `ScreenshotFrame` -> `TileImages` -> `SemanticUIModel` -> `ContextObject` -> `PromptPayload` -> `AIResponse` -> `ActionCommand`
 
 **Context Serialization Format (Data Structure)**
+*Security Note: Clipboard contents are deliberately excluded from this state object. All clipboard operations are executed blindly via app commands to prevent sensitive user data from entering logs, context limits, or AI prompt traces.*
+
 The exact structure serialized and injected into the AI context:
 ```json
 {
   "goal_state": {
-    "main_goal": "Turn off Windows Defender",
-    "current_subgoal": "Open Settings menu"
+    "main_goal": "Clean up desktop and open Spotify",
+    "current_subgoal": "Move files to documents and launch application"
   },
   "screen_state": {
     "active_window": "Desktop",
     "foveated_tile": "A",
     "visible_elements":[
-      {"id": "12", "type": "button", "state": "enabled"}
+      {"id": "12", "type": "icon", "text": "report.pdf"}
     ]
+  },
+  "system_state": {
+    "running_apps": ["chrome.exe", "code.exe"]
   },
   "cursor_state": {
     "x": 960, "y": 540, "tile": "B", "cell": "B01"
   },
   "history":[
-    {"action": "press_key", "target": "win", "result": "Start menu opened"}
+    {"action_type": "direct", "action": "search_files", "result": "report.pdf found"}
   ]
 }
 ```
@@ -313,7 +314,7 @@ context_limits:
 Automatically detects layout (e.g., monitor1 1920x1080, monitor2 1920x1080) and merges into one global coordinate space.
 
 **Windows DPI Scaling Trap Prevention**
-Windows often scales UI by 125% or 150%. MSS captures at native resolution, but PyAutoGUI moves the mouse based on scaled resolution. The agent uses `ctypes.windll.shcore.GetScaleFactorForDevice` to retrieve the exact scaling factor and applies a strict mathematical multiplier to all AI-generated coordinates before execution, preventing off-target clicks.
+Windows often scales UI by 125% or 150%. MSS captures at native resolution, but PyAutoGUI moves the mouse based on scaled resolution. The agent uses `ctypes.windll.shcore.GetScaleFactorForDevice` to retrieve the exact scaling factor and applies a strict mathematical multiplier to all AI-generated GUI coordinates before execution, preventing off-target clicks.
 
 **Grid Size Configuration**
 *   Screen is divided into primary tiles (A, B, C, D).
@@ -346,25 +347,31 @@ Movement is NOT instantaneous teleportation (which triggers anti-bot and UI glit
 **Context Size Limiter**
 Enforces strict token limits: Top 20 high-confidence elements only. History compressed to the last 5 actions.
 
-**System Prompt (Including the Below-the-Fold Scrolling Rule)**
-> "You are a highly capable computer control agent. You observe the screen through natively processed vision and Visual Grounding IDs. Your task is to achieve the user goal by selecting the next best logical action.
-> Rules: 1. Output ONLY JSON. 2. Use allowed operations only. 3. Never hallucinate elements. 4. Use element_id when available. 5. Prefer safe actions. 6. Avoid repeating actions. 7. If the target element is not visible on the current screen, you MUST output a `scroll_down` action before doing anything else. 8. Stop when goal is achieved."
+**System Prompt (Including Classification and Scroll Rules)**
+> "You are a highly capable computer control agent. You observe the system via OS APIs and natively processed vision. Your task is to achieve the user goal by selecting the next best logical action.
+> Rules: 1. Output ONLY JSON. 2. Classify your action as 'direct_execution' (API bypass) or 'gui_interaction' (Mouse/Keyboard). 3. Prefer Direct System Execution for file, app, and web management to ensure maximum speed. 4. Never hallucinate elements. 5. If using GUI and the target is not visible, output a `scroll_down` action. 6. Stop when the goal is achieved."
 
-**AI JSON Action Schema**
+**AI JSON Action Schema (Updated for Direct Execution)**
 ```json
 {
  "thought_process":[
-   "I see the settings icon at ID 23.",
-   "The window is currently focused."
+   "User wants to open Notepad.",
+   "Instead of clicking the start menu, I can use direct application control."
  ],
  "main_goal": "...",
  "current_goal": "...",
  "next_goal": "...",
- "action": {
-   "name": "left_click",
-   "target": {"element_id": "23"},
-   "tile": "B",
-   "cell": "B12"
+ "action_type": "direct_execution",
+ "direct_execution": {
+   "category": "application_control",
+   "command": "launch_program",
+   "parameters": {"app_name": "notepad.exe"}
+ },
+ "gui_action": {
+   "name": "null",
+   "target": {"element_id": "null"},
+   "tile": "null",
+   "cell": "null"
  },
  "input": {
    "text": "",
@@ -372,7 +379,7 @@ Enforces strict token limits: Top 20 high-confidence elements only. History comp
    "shortcut":[]
  },
  "verification": {"required": true},
- "state": {"confidence": 0.95, "reason": "Opening settings"}
+ "state": {"confidence": 0.99, "reason": "Bypassing GUI for instant execution"}
 }
 ```
 
@@ -380,44 +387,53 @@ Enforces strict token limits: Top 20 high-confidence elements only. History comp
 
 ## 11. Complete Operation & Action Types
 
-| Category | Allowed Operations / Logical Keys | Description / Examples |
+| Category | Allowed Operations / Commands | Description / Examples |
 | :--- | :--- | :--- |
-| **Mouse Operations** | `left_click` / `click`, `double_click`, `right_click`, `middle_click`, `click_and_hold`, `release_click`, `hover` | Core pointer interactions executed via PyAutoGUI. |
-| **Cursor Movement** | `move_cursor`, `move_cursor_relative`, `move_cursor_smooth`, `move_to_grid_cell`, `move_to_element` | Movement governed by Bezier path duration and DPI scaling. |
-| **Drag Operations** | `drag` / `drag_start`, `drag_move`, `drag_end`, `drag_and_drop` | Click, hold, and translate operations across UI elements. |
-| **Scrolling** | `scroll_up`, `scroll_down`, `scroll_left`, `scroll_right`, `scroll_to_element`, `scroll_to_top`, `scroll_to_bottom` | Triggered by the "Below-the-Fold" rule to navigate tall/wide views. |
-| **Keyboard Operations** | `type_text`, `press_key`, `hold_key`, `release_key`, `press_hotkey` / `keyboard_shortcut`, `paste_text`, `clear_field` | Jittered typing logic applied (0.02s - 0.07s delay per character). |
-| **Text Field Operations** | `focus_input`, `clear_input`, `type_text`, `submit_input` | Macro-actions grouped via Temporal Action Chunking. |
-| **Window & System** | `focus_window`, `switch_window`, `maximize_window`, `minimize_window`, `close_window`, `restore_window`, `open_application`, `close_application`, `launch_url`, `open_file`, `save_file`, `wait`, `finish`, `ask_user`, `confused` | System-level manipulations and agent lifecycle states. |
+| **Direct: Application Control** | `open_installed_app`, `launch_program`, `detect_installed_apps`, `check_app_running`, `focus_running_app`, `close_application` | Bypasses GUI to manipulate processes natively via OS execution layers. Maintains internal app registry. |
+| **Direct: File Operations** | `open_file`, `create_file`, `delete_file`, `rename_file`, `copy_file`, `move_file`, `create_folder`, `delete_folder`, `search_files`, `detect_paths` | Performs instant file I/O operations without interacting with Windows Explorer. |
+| **Direct: Folder / Explorer** | `open_folder`, `open_system_folder`, `reveal_file_location`, `open_explorer_at_path` | Directly bridges the agent to Windows file system directories (Downloads, Documents, Desktop). |
+| **Direct: Web Operations** | `open_url`, `detect_domain_launch`, `search_default_browser`, `open_web_service` | Automatically parses URLs/domains and opens them in the user's default browser. |
+| **Direct: System Commands** | `shutdown_system`, `restart_system`, `sleep_system`, `lock_screen`, `open_settings`, `open_task_manager`, `open_control_panel` | Native OS command execution, protected by user-intent safety guards. |
+| **Direct: Clipboard** | `copy_to_clipboard`, `paste_from_clipboard` | Securely executes copy/paste natively. Clipboard contents are completely restricted from AI context windows, logs, and UIs to ensure absolute data privacy. |
+| **Direct: Window Management** | `focus_window`, `minimize_window`, `maximize_window`, `restore_window`, `close_window`, `switch_window` | Manages active OS window states directly via Window API handles. |
+| **Direct: File Download** | `download_from_url`, `save_file_to_location` | Automates remote file fetching directly to disk. |
+| **Direct: Search Operations**| `search_installed_apps`, `search_files`, `search_folders` | Native deep search bypassing the Windows GUI Start Menu. |
+| **GUI: Mouse Operations** | `left_click` / `click`, `double_click`, `right_click`, `middle_click`, `click_and_hold`, `release_click`, `hover` | Core pointer interactions executed via PyAutoGUI. |
+| **GUI: Cursor Movement** | `move_cursor`, `move_cursor_relative`, `move_cursor_smooth`, `move_to_grid_cell`, `move_to_element` | Movement governed by Bezier path duration and DPI scaling. |
+| **GUI: Drag Operations** | `drag` / `drag_start`, `drag_move`, `drag_end`, `drag_and_drop` | Click, hold, and translate operations across UI elements. |
+| **GUI: Scrolling** | `scroll_up`, `scroll_down`, `scroll_left`, `scroll_right`, `scroll_to_element`, `scroll_to_top`, `scroll_to_bottom` | Triggered by the "Below-the-Fold" rule to navigate tall/wide views. |
+| **GUI: Keyboard Operations** | `type_text`, `press_key`, `hold_key`, `release_key`, `press_hotkey` / `keyboard_shortcut`, `paste_text`, `clear_field` | Jittered typing logic applied (0.02s - 0.07s delay per character). |
+| **GUI: Text Field Operations**| `focus_input`, `clear_input`, `type_text`, `submit_input` | Macro-actions grouped via Temporal Action Chunking. |
 | **Key Mapping (Modifiers)** | `ctrl`, `alt`, `shift`, `win` (Windows key) | Logical strings generated by AI mapped to execution layer. |
 | **Key Mapping (Function)** | `f1`, `f2`, `f3`, `f4`, `f5`, `f6`, `f7`, `f8`, `f9`, `f10`, `f11`, `f12` | Logical strings generated by AI mapped to execution layer. |
 | **Key Mapping (Nav)** | `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown` | Logical strings generated by AI mapped to execution layer. |
 | **Key Mapping (Control)** | `enter` (or `return`), `esc`, `tab`, `space`, `backspace`, `delete`, `insert` | Logical strings generated by AI mapped to execution layer. |
-| **Key Mapping (Shortcuts)**| Copy: `["ctrl", "c"]`, Paste: `["ctrl", "v"]`, Select All: `["ctrl", "a"]`, Save: `["ctrl", "s"]`, Undo: `["ctrl", "z"]`, Task Switch: `["alt", "tab"]`, Close Window: `["alt", "f4"]` | Executed securely via `shortcut([...])` combination arrays. |
+| **Key Mapping (Shortcuts)**| Copy: `["ctrl", "c"]`, Paste: `["ctrl", "v"]`, Task Switch: `["alt", "tab"]`, Close Window: `["alt", "f4"]` | Executed securely via `shortcut([...])` combination arrays. |
 
 ---
 
 ## 12. Execution, Validation & Safety
 
 **The Double-Click Heuristic**
-In Windows, desktop icons and file explorer items require a double-click to open. If the Semantic UI Analyzer identifies the target element as a "Desktop Icon" or "File Explorer Item," the executor will automatically upgrade the AI's `left_click` command to a `double_click`, preventing the agent from getting stuck.
+In Windows, desktop icons and file explorer items require a double-click to open. If the Semantic UI Analyzer identifies the target element as a "Desktop Icon" or "File Explorer Item," the executor will automatically upgrade the AI's `left_click` command to a `double_click`.
 
-**Action Execution Delay Matrix**
-To prevent UI race conditions, allow OS animations to finish, and strictly mimic human interaction speeds, specific delay ranges are hardcoded for action types:
+**Action Execution Delay Matrix (GUI only)**
+To prevent UI race conditions, allow OS animations to finish, and strictly mimic human interaction speeds:
 *   **Cursor Movement:** `0.2s - 0.5s` (Calculated dynamically via Bezier distance tweening)
 *   **Clicking (down/up):** `0.05s - 0.15s` inside the click; followed by a `0.3s` post-click pause
 *   **Typing Text:** `0.02s - 0.08s` delay per individual keystroke
 *   **Scrolling:** `0.1s - 0.3s` interval between scroll steps
 *   **Dragging:** `0.5s - 1.0s` duration for drag movement; `0.2s` hold before release
-*   **Window Switching (Alt+Tab / Focus):** `0.5s - 0.8s` delay to allow OS animation to fully complete
+*   **Window Switching:** `0.5s - 0.8s` delay to allow OS animation to fully complete
 *   **Application Launching:** `2.0s - 5.0s` delay (Dynamic wait polling based on active window detection)
+*   *Note: Direct System Execution commands run instantly with zero artificial delay.*
 
 **Safety Guard Rules (`safety_guard.py`)**
 Strict hardcoded rules the AI cannot override:
-1.  Prevent deleting system files (blocks `del /s C:\Windows\*`).
-2.  Prevent system shutdown/restart commands.
-3.  Prevent registry edits (blocks `regedit`).
-4.  Prevent installing unknown executable payloads from web.
+1.  **System File Protection:** Blocks deletion or modification of critical OS directories (e.g., `C:\Windows\*`), but allows user-requested file deletion in user directories via Direct Execution.
+2.  **OS Power Commands:** Shutdown/Restart/Sleep are now permitted *only* through the structured Direct System Execution Layer when explicitly requested by the user, but blocked from arbitrary command-line hallucinations.
+3.  **Registry Protection:** Blocks unauthorized registry edits (`regedit`).
+4.  **UAC Detection:** Pauses execution if a User Account Control prompt is detected.
 
 **Action Validation & Focus**
 Every action is validated: Element exists? Bounding box valid? Cursor reachable? Window active? (Focus window if needed).
@@ -426,7 +442,7 @@ Every action is validated: Element exists? Bounding box valid? Cursor reachable?
 Monitors `pynput`. Detects mouse move or keystroke. Response: Pause AI -> Update cursor state -> Recapture -> Rebuild Context -> Resume.
 
 **Screen Change Detection Thresholds**
-To verify an action worked, exactly one of these thresholds must be met:
+To verify a GUI action worked, exactly one of these thresholds must be met:
 *   **Pixel Difference Threshold:** `3%` change in rendered pixels.
 *   **SSIM (Structural Similarity) Threshold:** `< 0.92` (meaning structure changed by at least 8%).
 *   **Perceptual Hash (pHash) Distance:** `> 10` (significant visual shift).
@@ -482,7 +498,7 @@ Stored in: `data/memory/`
 *   **Lifetime:** Persistent. Used for RAG.
 
 **Memory Update Flow**
-Action executed -> Screen changes (Threshold met) -> SQLite logs session -> Short term RAM state updates -> Goal Complete? Embed workflow sequence into Vector DB.
+Action executed -> Action Verified (Screen change or OS API return) -> SQLite logs session -> Short term RAM state updates -> Goal Complete? Embed workflow sequence into Vector DB.
 
 ---
 
@@ -518,6 +534,8 @@ agent-sam/
 ├── runtime/
 │   ├── engine.py            <-- (Main runtime loop, CPU performance monitor, loop detector)
 │   ├── executor.py          <-- (Action execution, Action Delay Matrix, Double-Click Heuristics)
+│   ├── direct_executor.py   <-- (Direct System Execution Layer: File/Web/OS APIs)
+│   ├── app_registry.py      <-- (Maintains internal application registry and states)
 │   └── observers.py         <-- (Screen change thresholds, reflection critic, JSON repair)
 │
 ├── perception/
@@ -527,7 +545,7 @@ agent-sam/
 │
 ├── ai/
 │   ├── llm_client.py        <-- (Internal llama-cpp runtime interface, VRAM locking, timeouts, HF loader)
-│   ├── prompt_engine.py     <-- (Prompt builder, multimodal thinking trace, strict JSON serializer/parser)
+│   ├── prompt_engine.py     <-- (Prompt builder, Direct vs GUI classifier, multimodal thinking trace)
 │   └── action_planner.py    <-- (Goal reasoning, RAG semantic memory injection)
 │
 ├── core/
@@ -535,7 +553,7 @@ agent-sam/
 │   ├── cursor_engine.py     <-- (Tracker, controller, verifier, Bezier paths, DPI Scaling Math)
 │   ├── input_manager.py     <-- (User interference handler, Thought Cloning listener, Key Mapping)
 │   ├── memory_manager.py    <-- (Short term RAM, SQLite session logging, ChromaDB Vector RAG)
-│   ├── safety_guard.py      <-- (Hardcoded Registry/File protection rules)
+│   ├── safety_guard.py      <-- (Hardcoded OS/File protection rules)
 │   └── app_ui.py            <-- (Taskbar Live Console, CustomTkinter Dashboard, Chatbox, Tray icon)
 │
 ├── utils/
