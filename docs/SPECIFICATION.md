@@ -9,30 +9,30 @@ Inspired by cutting-edge architectures like Anthropic's Computer Use, Open Inter
 ## 1. Runtime Environment & Dependencies
 **Runtime Environment**
 *   **Programming language:** Python 3.14
-*   **Execution Logic:** All processing, vision, OS integration, and reasoning happens 100% locally within the agent-sam process.
+*   **Execution Logic:** All OS integration, vision mapping, and direct execution happens 100% locally within the agent-sam process. Inference logic dynamically routes to either local hardware or a remote Cloud GPU backend.
 
 **Embedded Inference Strategy (Zero User Setup)**
-*   **Goal:** Enable the AI model to run automatically within the application with zero user setup.
-*   **Plan:** Integrate an optimized inference runtime based on `llama.cpp` directly into the project. Package the runtime and model management system inside the application so no external installation is required. On startup, the application checks for the required GGUF model and downloads it automatically if it is not present. The runtime is launched internally as a background component and exposes an internal inference interface used by the agent system. The agent logic, automation system, and context pipeline communicate with this runtime for reasoning tasks. The runtime remains fully managed by the application lifecycle, ensuring the user only launches the application while all model setup and execution occur automatically within the codebase.
+*   **Goal:** Enable the AI model to run automatically within the application with zero user setup, regardless of the user's local hardware constraints.
+*   **Plan:** Integrate an optimized inference runtime based on `llama.cpp` directly into the project. Package the runtime and model management system inside the application. On startup, the application checks for the required GGUF model and downloads it automatically if local execution is chosen. The runtime is launched internally as a background component. Alternatively, if the user has a low-end PC, the system seamlessly connects to an external OpenAI-compatible Cloudflare Tunnel hosted on a free Google Colab GPU. The agent logic, automation system, and context pipeline communicate with the selected endpoint for reasoning tasks seamlessly.
 
-**AI Model Selection (Hugging Face Native)**
-The installer automatically downloads the selected GGUF model weights from Hugging Face into `data/models/`. All models support a context window of >=256K tokens.
+**AI Model Selection (Hugging Face Native & Cloud GPU)**
+The installer prompts the user to select an execution mode. If a local model is chosen, it downloads the selected GGUF model weights from Hugging Face into `data/models/`. All models support a context window of >=256K tokens.
 
-Select AI Model:
-
+Select AI Model:[Local Execution - Requires PC GPU/RAM]
 1. Qwen3.5-2B-Instruct      (Size: ~4.57 GB | Fast / Low RAM)
 2. Qwen3-VL-2B-Instruct     (Size: ~4.27 GB | Vision-Language Optimized)
 3. Qwen3.5-4B-Instruct      (Size: ~9.34 GB | Advanced Reasoning)
-4. Qwen3-VL-2B-Thinking     (Size: ~4.27 GB | Visual Reasoning + Logic)
+4. Qwen3-VL-2B-Thinking     (Size: ~4.27 GB | Visual Reasoning + Logic)[Cloud Execution - Runs on Any PC]
+5. Cloud GPU Backend        (Google Colab + Cloudflare Tunnel | Zero local hardware required)
 
 **Core Libraries Used**
-*   **Inference:** `llama-cpp-python` (Packaged internally for zero-setup, Native VRAM locking and KV caching).
+*   **Inference:** `llama-cpp-python` (Packaged internally for zero-setup local execution) and `requests` (For Cloud GPU API bridging).
 *   **Screen capture:** MSS (aware of Windows DPI settings).
 *   **Mouse/Keyboard:** PyAutoGUI + `pynput` (for monitoring).
 *   **Computer Vision:** OpenCV (Set-of-Mark overlays).
 *   **System Environment:** `ctypes`, `psutil`, `shutil`, `winreg` (For Windows DPI Scaling extraction, Application Registry, and Direct System Execution).
 *   **Storage:** `ChromaDB` (Vector RAG) and `SQLite` (Session logs).
-*   **UI:** `CustomTkinter` and `pystray`.
+*   **UI & Mobile Control:** `CustomTkinter`, `pystray`, and `python-telegram-bot` (For secure mobile remote control).
 
 ---
 
@@ -40,18 +40,18 @@ Select AI Model:
 User runs `run_app.bat`. The `installer.py` handles the entire environment setup programmatically, ensuring zero user configuration:
 1.  **Venv Setup:** Creates `.venv` and installs `requirements.txt`.
 2.  **Hardware Check:** Detects CPU cores and CUDA availability for GPU acceleration.
-3.  **Model Selection:** Prompts user to select from the 4 Qwen models.
-4.  **Hugging Face Download:** Uses `huggingface_hub` to check for the required GGUF model and downloads weights directly into `agent-sam/data/models/` if not present.
-5.  **Initialization:** The internal `llama.cpp` runtime is launched internally as a background component. It loads the model into VRAM with a Keep-Alive lock and exposes the internal inference interface to the agent system.
+3.  **Model Selection:** Prompts user to select from the 5 execution modes.
+4.  **Hugging Face Download / Tunnel Link:** If options 1-4 are selected, uses `huggingface_hub` to download weights directly into `agent-sam/data/models/`. If option 5 is selected, the console asks the user to paste their Cloudflare Tunnel URL from Google Colab.
+5.  **Initialization:** The internal `llama.cpp` runtime is launched (if local) loading the model into VRAM with a Keep-Alive lock. The internal inference interface is exposed to the agent system.
 
 ---
 
-## 3. User Goal Input System (The 10 Parameters)
-The system accepts user instructions through multiple integrated channels:
-*   **Dashboard Chatbox:** Standard text input UI.
+## 3. User Goal Input System
+The system accepts user instructions through multiple integrated channels, combining PC-based and Mobile-based inputs:
+*   **Telegram Bot (Mobile Remote Control - Primary):** Secure, zero-frontend remote control from any smartphone. The agent listens via `python-telegram-bot` using long polling (no port-forwarding required). Securely restricted to a specific Telegram User ID defined in `config.yaml`. Supports text commands and Whisper-transcribed voice notes sent from the phone directly to the PC.
+*   **Dashboard Chatbox:** Standard text input UI running locally via CustomTkinter.
 *   **Command Input:** CLI arguments on launch.
-*   **Voice (Optional integration plug-in):** Whisper local STT API.
-*   **API / Webhook:** REST endpoint for external scripts to pass goals.
+*   **API / Webhook:** REST endpoint for external scripts to pass goals locally.
 
 ---
 
@@ -59,7 +59,7 @@ The system accepts user instructions through multiple integrated channels:
 *(Control Flow + Data Flow + Memory + AI Interaction + Direct Execution + Shutdown Flow)*
 
 ```text
-USER STARTS APPLICATION & INPUTS GOAL
+USER STARTS APPLICATION & INPUTS GOAL (via Desktop UI or Mobile Telegram Bot)
         │
         ▼
 run_app.bat
@@ -69,15 +69,15 @@ BOOTSTRAP INSTALLER
         │
         ├─ Check Python 3.14
         ├─ Create virtual environment
-        ├─ Install dependencies (llama-cpp-python)
-        ├─ Prompt User & Download Selected GGUF Model via Hugging Face
+        ├─ Install dependencies (llama-cpp-python, python-telegram-bot)
+        ├─ Prompt User for Model (Local GGUF Download OR Cloudflare Colab URL)
         │      ├─ Success -> Continue
         │      └─ Failure -> Retry (3) / Abort
         │
         ▼
 LAUNCH AGENT & SYSTEM INITIALIZATION
         │
-        ├─ Load config.yaml
+        ├─ Load config.yaml (Includes Telegram User ID & Thresholds)
         ├─ Initialize structured logging
         ├─ Initialize safety guard
         ├─ Initialize performance controller
@@ -86,8 +86,8 @@ LAUNCH AGENT & SYSTEM INITIALIZATION
         ├─ Initialize screenshot engine (with DPI Scaling awareness)
         ├─ Initialize grid engine & Cursor tracker
         ├─ Initialize Direct System Execution Layer & App Registry
-        ├─ Launch Internal llama.cpp Runtime as Background Component
-        ├─ Load AI Model into VRAM (Keep-Alive lock applied)
+        ├─ Start Telegram Long-Polling Listener (Background Thread)
+        ├─ Launch Internal llama.cpp Runtime OR Connect to Colab Tunnel
         ├─ Initialize JSON repair layer & Loop detector
         ├─ Initialize user input monitor
         └─ Initialize system tray + dashboard
@@ -134,7 +134,7 @@ GRID OVERLAY & SET-OF-MARK (SOM) VISUAL GROUNDING
         ▼
 NATIVE VLM PERCEPTION (NO EXTERNAL OCR)
         │
-        ├─ Unified visual token processing (Internal Inference Interface)
+        ├─ Unified visual token processing (Local Inference OR Colab API)
         ├─ Spatial 2D Grounding: Extract element coordinates natively using Qwen <box> syntax
         ├─ Semantic UI Mapping: Detect search bars, menus, buttons
         └─ Element State Tracking: enabled/focused/checked/filled
@@ -158,7 +158,7 @@ CONTEXT BUILDER & RAG MEMORY INJECTION
 PROMPT BUILDER & AI REASONING
         │
         ├─ Insert system prompt & JSON action schema
-        ├─ Insert UI context & Send Prompt -> Internal llama.cpp Component
+        ├─ Insert UI context & Send Prompt -> Internal Component OR Cloudflare Tunnel
         │
         ▼
 RECEIVE RESPONSE & CLASSIFICATION
@@ -212,7 +212,7 @@ MEMORY UPDATE FLOW & REPLAY RECORDER
 PERFORMANCE CONTROLLER & GOAL CHECK
         │
         ├─ Monitor CPU -> Adjust screenshot rate
-        ├─ Goal complete -> STOP -> INITIATE SHUTDOWN
+        ├─ Goal complete -> STOP -> Notify Telegram -> INITIATE SHUTDOWN
         └─ Not complete -> RETURN LOOP
         │
         ▼
@@ -223,7 +223,7 @@ GRACEFUL SHUTDOWN FLOW
         ├─ Flush memory buffers to disk
         ├─ Close SQLite and Vector DB connections
         ├─ Save final replay session metadata
-        ├─ Terminate screenshot and AI worker threads
+        ├─ Terminate screenshot, Telegram listener, and AI worker threads
         ├─ Unload Model from VRAM & terminate internal background component
         └─ Safely close Tray UI / Dashboard
 ```
@@ -304,6 +304,10 @@ ai:
 context_limits:
   max_ui_elements: 20
   action_history: 5
+
+remote_control:
+  telegram_bot_token: "YOUR_BOT_TOKEN_HERE"
+  authorized_user_id: "123456789"
 ```
 
 ---
@@ -330,8 +334,8 @@ To speed up screen comparison, frames are cached in RAM:
 
 ## 9. Native Perception & Cursor Systems
 
-**Native VLM Pipeline (In-Process)**
-Uses the selected AI Model's native visual processing loaded securely into VRAM via the internal inference engine. Generates bounding boxes and semantic understanding (SearchBar, Button) directly from the compressed image using Qwen-VL's native `<box>` spatial grounding outputs.
+**Native VLM Pipeline (In-Process or Cloud GPU)**
+Uses the selected AI Model's native visual processing. Generates bounding boxes and semantic understanding (SearchBar, Button) directly from the compressed image using Qwen-VL's native `<box>` spatial grounding outputs.
 
 **Cursor Speed Profile & Movement Validation**
 Movement is NOT instantaneous teleportation (which triggers anti-bot and UI glitches).
@@ -473,8 +477,8 @@ When the user triggers a stop, or the goal is fully achieved, the system execute
 2. Flush all active memory buffers to disk.
 3. Close SQLite and Vector Database connections securely.
 4. Finalize and save replay session metadata.
-5. Terminate screenshot and AI worker threads.
-6. Instruct the internal `llama.cpp` runtime to dump the VRAM cache and safely terminate the background component.
+5. Terminate screenshot, Telegram listener, and AI worker threads.
+6. Instruct the internal runtime/tunnel logic to dump VRAM cache and safely terminate.
 7. Safely close Tray UI and Dashboard.
 
 ---
@@ -505,7 +509,7 @@ Action executed -> Action Verified (Screen change or OS API return) -> SQLite lo
 ## 15. System Monitoring & Debugging
 
 **VRAM Keep-Alive Locking**
-Upon initialization, the selected Qwen model is locked securely into memory via the internal inference engine (e.g., setting GPU layer limits in `llama-cpp-python`). This ensures instant, zero-latency inference for the entirety of the agent's lifespan, managed entirely by the application lifecycle without external dependencies.
+Upon initialization of a local model, the selected Qwen model is locked securely into memory via the internal inference engine (e.g., setting GPU layer limits in `llama-cpp-python`). This ensures instant, zero-latency inference for the entirety of the agent's lifespan, managed entirely by the application lifecycle.
 
 **Runtime Performance Controller**
 Monitors CPU dynamically. If CPU usage > 85%, adjusts `screenshot_interval` dynamically to prevent thermal throttling.
@@ -527,7 +531,7 @@ All events logged to `data/logs/`. Sessions saved to `data/replay_sessions/` con
 agent-sam/
 ├── run_app.bat
 ├── requirements.txt
-├── config.yaml              <-- (Centralized thresholds, timeouts, settings)
+├── config.yaml              <-- (Centralized thresholds, timeouts, Telegram auth, settings)
 ├── installer.py             <-- (Handles Model Menu, Python env setup, Hugging Face GGUF downloader)
 ├── main.py                  <-- (Entry point, config loading, and orchestrator)
 │
@@ -544,14 +548,14 @@ agent-sam/
 │   └── semantic_mapper.py   <-- (Element mapping, state tracking, semantic analyzer)
 │
 ├── ai/
-│   ├── llm_client.py        <-- (Internal llama-cpp runtime interface, VRAM locking, timeouts, HF loader)
+│   ├── llm_client.py        <-- (Internal llama-cpp API/Cloudflare Tunnel Bridge, VRAM locking, HF loader)
 │   ├── prompt_engine.py     <-- (Prompt builder, Direct vs GUI classifier, multimodal thinking trace)
 │   └── action_planner.py    <-- (Goal reasoning, RAG semantic memory injection)
 │
 ├── core/
 │   ├── config_manager.py    <-- (Parses config.yaml and distributes global settings)
 │   ├── cursor_engine.py     <-- (Tracker, controller, verifier, Bezier paths, DPI Scaling Math)
-│   ├── input_manager.py     <-- (User interference handler, Thought Cloning listener, Key Mapping)
+│   ├── input_manager.py     <-- (Telegram Polling listener, Thought Cloning, User interference handler)
 │   ├── memory_manager.py    <-- (Short term RAM, SQLite session logging, ChromaDB Vector RAG)
 │   ├── safety_guard.py      <-- (Hardcoded OS/File protection rules)
 │   └── app_ui.py            <-- (Taskbar Live Console, CustomTkinter Dashboard, Chatbox, Tray icon)
@@ -566,4 +570,82 @@ agent-sam/
     ├── logs/
     ├── screenshots/
     └── replay_sessions/
+```
+
+---
+
+## APPENDIX A: Cloud GPU Backend (Google Colab + Llama.cpp)
+
+### 1. Colab Server Code (Single Cell)
+Paste this into a single Google Colab cell. It mounts Drive, compiles `llama.cpp` for CUDA, downloads the 4B vision model (only ~5GB), and opens an OpenAI-compatible Cloudflare tunnel for remote execution.
+
+```python
+from google.colab import drive
+import os, subprocess, time
+
+# 1. Setup Drive & Cache
+drive.mount('/content/drive')
+MODEL_DIR = "/content/drive/MyDrive/agent-sam-models"
+os.makedirs(MODEL_DIR, exist_ok=True)
+
+# 2. Install & Compile llama.cpp
+!pip install -q -U huggingface_hub[cli]
+if not os.path.exists("/content/llama.cpp/llama-server"):
+    !git clone https://github.com/ggerganov/llama.cpp
+    !cd llama.cpp && make clean && make GGML_CUDA=1 -j
+
+# 3. Download Qwen3-VL 4B GGUF Weights
+LLM_REPO = "Qwen/Qwen3-VL-4B-Instruct-GGUF"
+LLM_FILE = "qwen3-vl-4b-instruct-q4_k_m.gguf"
+MMPROJ_FILE = "mmproj-qwen3-vl-4b-instruct-f16.gguf"
+
+LLM_PATH = os.path.join(MODEL_DIR, LLM_FILE)
+MMPROJ_PATH = os.path.join(MODEL_DIR, MMPROJ_FILE)
+
+!huggingface-cli download {LLM_REPO} {LLM_FILE} --local-dir {MODEL_DIR}
+!huggingface-cli download {LLM_REPO} {MMPROJ_FILE} --local-dir {MODEL_DIR}
+
+# 4. Start Native OpenAI-Compatible Server
+server_cmd =[
+    "/content/llama.cpp/llama-server",
+    "-m", LLM_PATH, "--mmproj", MMPROJ_PATH,
+    "-ngl", "99", "-c", "8192", "--port", "8000", "--host", "0.0.0.0"
+]
+subprocess.Popen(server_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+time.sleep(10)
+
+# 5. Start Cloudflare Tunnel
+if not os.path.exists("cloudflared-linux-amd64"):
+    !wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+    !chmod +x cloudflared-linux-amd64
+
+!./cloudflared-linux-amd64 tunnel --url http://127.0.0.1:8000
+```
+
+### 2. Integration with agent-sam
+When "Cloud GPU Backend" is selected in the installer, the user pastes the Cloudflare URL into the application prompt. The desktop client (`ai/llm_client.py`) automatically routes requests to this URL, perfectly matching the OpenAI vision format without utilizing local hardware for inference.
+
+**Endpoint:** `https://[cloudflare-url]/v1/chat/completions`
+
+**Payload Schema:**
+```json
+{
+  "messages":[
+    {
+      "role": "user",
+      "content":[
+        {
+          "type": "image_url",
+          "image_url": {"url": "data:image/jpeg;base64,[BASE64_STRING]"}
+        },
+        {
+          "type": "text",
+          "text": "[SYSTEM_PROMPT_AND_UI_CONTEXT]"
+        }
+      ]
+    }
+  ],
+  "temperature": 0.0,
+  "max_tokens": null
+}
 ```
