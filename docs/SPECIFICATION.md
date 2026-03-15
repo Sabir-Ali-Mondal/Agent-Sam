@@ -32,7 +32,7 @@ Select AI Model:[Local Execution - Requires PC GPU/RAM]
 *   **Computer Vision:** OpenCV (Set-of-Mark overlays).
 *   **System Environment:** `ctypes`, `psutil`, `shutil`, `winreg` (For Windows DPI Scaling extraction, Application Registry, and Direct System Execution).
 *   **Storage:** `ChromaDB` (Vector RAG) and `SQLite` (Session logs).
-*   **UI & Mobile Control:** `CustomTkinter`, `pystray`, and `python-telegram-bot` (For secure mobile remote control).
+*   **UI & Mobile Control:** `CustomTkinter`, `pystray`, and `python-telegram-bot` (For secure mobile remote control and interactive permission requests).
 
 ---
 
@@ -46,10 +46,12 @@ User runs `run_app.bat`. The `installer.py` handles the entire environment setup
 
 ---
 
-## 3. User Goal Input System
-The system accepts user instructions through multiple integrated channels, combining PC-based and Mobile-based inputs:
-*   **Telegram Bot (Mobile Remote Control - Primary):** Secure, zero-frontend remote control from any smartphone. The agent listens via `python-telegram-bot` using long polling (no port-forwarding required). Securely restricted to a specific Telegram User ID defined in `config.yaml`. Supports text commands and Whisper-transcribed voice notes sent from the phone directly to the PC.
-*   **Dashboard Chatbox:** Standard text input UI running locally via CustomTkinter.
+## 3. User Goal Input & Interactive Permission System
+The system accepts user instructions and requests real-time interactive feedback through multiple channels:
+*   **Telegram Bot (Mobile Remote Control - Primary):** Secure, zero-frontend remote control from any smartphone. The agent listens via `python-telegram-bot` using long polling. Securely restricted to a specific Telegram User ID defined in `config.yaml`.
+    *   **Goal Input:** User can send text commands or Whisper-transcribed voice notes to start workflows.
+    *   **Interactive Prompts:** If the AI encounters a missing variable (e.g., "What is the password for this form?") or attempts a destructive action (e.g., "Can I delete the 'taxes_2024' folder?"), the agent pauses the runtime loop, sends a push notification via Telegram to the user, and waits for a text reply (Yes/No/Information data) before resuming execution.
+*   **Dashboard Chatbox:** Standard text input UI running locally via CustomTkinter (Mirrors Telegram permission prompts locally).
 *   **Command Input:** CLI arguments on launch.
 *   **API / Webhook:** REST endpoint for external scripts to pass goals locally.
 
@@ -163,6 +165,7 @@ PROMPT BUILDER & AI REASONING
         ▼
 RECEIVE RESPONSE & CLASSIFICATION
         │
+        ├─ Request Class: Interactive Prompt? -> Pause Loop -> Ping Telegram -> Wait for user reply
         ├─ Request Class: Direct System Command? -> Execute via Direct System Layer (Bypass GUI)
         └─ Request Class: GUI Interaction? -> Proceed to Reflection & Critic Loop
         │
@@ -175,7 +178,7 @@ JSON REPAIR LAYER & LOOP DETECTOR
         ▼
 SAFETY GUARD & ACTION VALIDATION
         │
-        ├─ Violates Safety Rules? (Protect C:\Windows, allow user-directed OS commands)
+        ├─ Violates Safety Rules? (Protect C:\Windows, force explicit Telegram permission for deletions)
         ├─ Element exists & Bounding box valid?
         ├─ Window focused & Cursor reachable?
         │
@@ -351,25 +354,29 @@ Movement is NOT instantaneous teleportation (which triggers anti-bot and UI glit
 **Context Size Limiter**
 Enforces strict token limits: Top 20 high-confidence elements only. History compressed to the last 5 actions.
 
-**System Prompt (Including Classification and Scroll Rules)**
+**System Prompt (Including Classification, Scroll, and Interactive Request Rules)**
 > "You are a highly capable computer control agent. You observe the system via OS APIs and natively processed vision. Your task is to achieve the user goal by selecting the next best logical action.
-> Rules: 1. Output ONLY JSON. 2. Classify your action as 'direct_execution' (API bypass) or 'gui_interaction' (Mouse/Keyboard). 3. Prefer Direct System Execution for file, app, and web management to ensure maximum speed. 4. Never hallucinate elements. 5. If using GUI and the target is not visible, output a `scroll_down` action. 6. Stop when the goal is achieved."
+> Rules: 1. Output ONLY JSON. 2. Classify your action as 'direct_execution' (API bypass), 'gui_interaction' (Mouse/Keyboard), or 'interactive_request' (Ask User). 3. Prefer Direct System Execution for file, app, and web management to ensure maximum speed. 4. Never hallucinate elements. 5. If using GUI and the target is not visible, output a `scroll_down` action. 6. If you need sensitive data (e.g., passwords, personal details to fill a form) or permission to execute a destructive action (e.g., deleting user folders), you MUST output an 'interactive_request' to pause and ask the user via Telegram. 7. Stop when the goal is achieved."
 
-**AI JSON Action Schema (Updated for Direct Execution)**
+**AI JSON Action Schema (Updated for Direct Execution & Interactive Requests)**
 ```json
 {
  "thought_process":[
-   "User wants to open Notepad.",
-   "Instead of clicking the start menu, I can use direct application control."
+   "User wants to delete the 'Old_Taxes' folder.",
+   "This is a destructive action. I must request explicit permission before proceeding."
  ],
  "main_goal": "...",
  "current_goal": "...",
  "next_goal": "...",
- "action_type": "direct_execution",
+ "action_type": "interactive_request",
+ "interactive_request": {
+   "question": "Are you sure you want me to permanently delete the 'Old_Taxes' folder?",
+   "request_type": "permission" 
+ },
  "direct_execution": {
-   "category": "application_control",
-   "command": "launch_program",
-   "parameters": {"app_name": "notepad.exe"}
+   "category": "null",
+   "command": "null",
+   "parameters": {}
  },
  "gui_action": {
    "name": "null",
@@ -383,7 +390,7 @@ Enforces strict token limits: Top 20 high-confidence elements only. History comp
    "shortcut":[]
  },
  "verification": {"required": true},
- "state": {"confidence": 0.99, "reason": "Bypassing GUI for instant execution"}
+ "state": {"confidence": 0.99, "reason": "Awaiting human verification for destructive file operation."}
 }
 ```
 
@@ -393,6 +400,7 @@ Enforces strict token limits: Top 20 high-confidence elements only. History comp
 
 | Category | Allowed Operations / Commands | Description / Examples |
 | :--- | :--- | :--- |
+| **Interactive Request** | `ask_permission`, `request_information` | Halts the runtime loop and pings the user on Telegram for a Yes/No approval or specific data input (e.g., passwords, form details). |
 | **Direct: Application Control** | `open_installed_app`, `launch_program`, `detect_installed_apps`, `check_app_running`, `focus_running_app`, `close_application` | Bypasses GUI to manipulate processes natively via OS execution layers. Maintains internal app registry. |
 | **Direct: File Operations** | `open_file`, `create_file`, `delete_file`, `rename_file`, `copy_file`, `move_file`, `create_folder`, `delete_folder`, `search_files`, `detect_paths` | Performs instant file I/O operations without interacting with Windows Explorer. |
 | **Direct: Folder / Explorer** | `open_folder`, `open_system_folder`, `reveal_file_location`, `open_explorer_at_path` | Directly bridges the agent to Windows file system directories (Downloads, Documents, Desktop). |
@@ -434,10 +442,11 @@ To prevent UI race conditions, allow OS animations to finish, and strictly mimic
 
 **Safety Guard Rules (`safety_guard.py`)**
 Strict hardcoded rules the AI cannot override:
-1.  **System File Protection:** Blocks deletion or modification of critical OS directories (e.g., `C:\Windows\*`), but allows user-requested file deletion in user directories via Direct Execution.
-2.  **OS Power Commands:** Shutdown/Restart/Sleep are now permitted *only* through the structured Direct System Execution Layer when explicitly requested by the user, but blocked from arbitrary command-line hallucinations.
-3.  **Registry Protection:** Blocks unauthorized registry edits (`regedit`).
-4.  **UAC Detection:** Pauses execution if a User Account Control prompt is detected.
+1.  **System File Protection:** Blocks deletion or modification of critical OS directories (e.g., `C:\Windows\*`). 
+2.  **Explicit User Permission:** Any file deletion outside of user-temp folders triggers a mandatory `interactive_request` for Telegram approval.
+3.  **OS Power Commands:** Shutdown/Restart/Sleep are blocked from arbitrary hallucination and enforce explicit Telegram verification.
+4.  **Registry Protection:** Blocks unauthorized registry edits (`regedit`).
+5.  **UAC Detection:** Pauses execution if a User Account Control prompt is detected.
 
 **Action Validation & Focus**
 Every action is validated: Element exists? Bounding box valid? Cursor reachable? Window active? (Focus window if needed).
@@ -478,7 +487,7 @@ When the user triggers a stop, or the goal is fully achieved, the system execute
 3. Close SQLite and Vector Database connections securely.
 4. Finalize and save replay session metadata.
 5. Terminate screenshot, Telegram listener, and AI worker threads.
-6. Instruct the internal runtime/tunnel logic to dump VRAM cache and safely terminate.
+6. Instruct the internal `llama.cpp` runtime to dump the VRAM cache and safely terminate the background component.
 7. Safely close Tray UI and Dashboard.
 
 ---
@@ -549,13 +558,13 @@ agent-sam/
 │
 ├── ai/
 │   ├── llm_client.py        <-- (Internal llama-cpp API/Cloudflare Tunnel Bridge, VRAM locking, HF loader)
-│   ├── prompt_engine.py     <-- (Prompt builder, Direct vs GUI classifier, multimodal thinking trace)
+│   ├── prompt_engine.py     <-- (Prompt builder, Direct/GUI/Interactive classifier, thinking trace)
 │   └── action_planner.py    <-- (Goal reasoning, RAG semantic memory injection)
 │
 ├── core/
 │   ├── config_manager.py    <-- (Parses config.yaml and distributes global settings)
 │   ├── cursor_engine.py     <-- (Tracker, controller, verifier, Bezier paths, DPI Scaling Math)
-│   ├── input_manager.py     <-- (Telegram Polling listener, Thought Cloning, User interference handler)
+│   ├── input_manager.py     <-- (Telegram Polling listener, Interactive Request Handler, Key Mapping)
 │   ├── memory_manager.py    <-- (Short term RAM, SQLite session logging, ChromaDB Vector RAG)
 │   ├── safety_guard.py      <-- (Hardcoded OS/File protection rules)
 │   └── app_ui.py            <-- (Taskbar Live Console, CustomTkinter Dashboard, Chatbox, Tray icon)
